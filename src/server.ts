@@ -2,23 +2,34 @@ import express from 'express';
 import cors from 'cors';
 import { WebSocketServer, WebSocket } from 'ws';
 import http from 'http';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 const server = http.createServer(app);
 
-// Configure WebSocket server with explicit path
+// Configure WebSocket server
 const wss = new WebSocketServer({ 
-  noServer: true // Don't attach to server automatically
+  noServer: true
 });
 
-// Configure CORS to accept requests from anywhere since we're testing
+// Configure CORS
 app.use(cors());
 app.use(express.json());
 
-const clients = new Set<WebSocket>();
+// Serve static files from the client build directory
+app.use(express.static(path.join(__dirname, '../dist/client')));
 
 // Handle WebSocket upgrade requests
 server.on('upgrade', (request, socket, head) => {
+  if (!request.url) {
+    socket.destroy();
+    return;
+  }
+
   const pathname = new URL(request.url, `http://${request.headers.host}`).pathname;
 
   if (pathname === '/ws') {
@@ -30,9 +41,9 @@ server.on('upgrade', (request, socket, head) => {
   }
 });
 
+// WebSocket connection handling
 wss.on('connection', (ws) => {
   console.log('New client connected');
-  clients.add(ws);
   
   // Send initial empty data
   ws.send(JSON.stringify({
@@ -42,82 +53,76 @@ wss.on('connection', (ws) => {
   
   ws.on('close', () => {
     console.log('Client disconnected');
-    clients.delete(ws);
   });
 
   ws.on('error', (error) => {
     console.error('WebSocket error:', error);
-    clients.delete(ws);
   });
 });
 
-// Test endpoint to verify the server is running
-app.get('/', (req, res) => {
-  res.json({ status: 'ok', message: 'Sales Rankings Webhook Server' });
-});
+interface RankingEntry {
+  rank: number;
+  name: string;
+}
 
+// Webhook endpoint
 app.post('/webhook', (req, res) => {
-  console.log('Received webhook data:', req.body);
-  
-  // Check if we have data in either text or data field
   const textData = req.body.text || req.body.data;
   if (!textData) {
-    console.error('Missing text/data in webhook request');
     return res.status(400).json({ error: 'Missing text/data' });
   }
   
   try {
-    // Parse the rankings data
-    const lines = textData.split('\n').filter(line => line.trim());
-    console.log('Processing lines:', lines);
-    
+    const lines = textData.split('\n').filter((line: string) => line.trim());
     const rankings = lines
-      .slice(1) // Skip the title
-      .map((line) => {
+      .slice(1)
+      .map((line: string) => {
         const match = line.match(/^\d+\.\s+(.+)$/);
         if (match) {
           return {
-            rank: parseInt(line.match(/^\d+/)[0], 10),
+            rank: parseInt(line.match(/^\d+/)?.[0] ?? '0', 10),
             name: match[1].trim()
           };
         }
         return null;
       })
-      .filter(Boolean)
-      .slice(0, 10); // Only keep top 10
+      .filter((entry): entry is RankingEntry => entry !== null)
+      .slice(0, 10);
 
-    console.log('Parsed rankings:', rankings);
-
-    // Broadcast to all connected clients
     const update = {
       lastUpdated: new Date().toLocaleString(),
       rankings
     };
 
-    let broadcastCount = 0;
-    clients.forEach(client => {
+    // Broadcast to all connected clients
+    wss.clients.forEach(client => {
       if (client.readyState === WebSocket.OPEN) {
-        try {
-          client.send(JSON.stringify(update));
-          broadcastCount++;
-        } catch (error) {
-          console.error('Error sending to client:', error);
-          clients.delete(client);
-        }
+        client.send(JSON.stringify(update));
       }
     });
 
-    console.log(`Broadcasted to ${broadcastCount} clients`);
-    res.json({ success: true, rankings, clientCount: broadcastCount });
+    res.json({ success: true, rankings });
   } catch (error) {
     console.error('Error processing webhook data:', error);
-    res.status(500).json({ error: 'Failed to process rankings data', details: error.message });
+    res.status(500).json({ 
+      error: 'Failed to process rankings data',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    });
   }
+});
+
+// Serve index.html for all other routes
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, '../dist/client/index.html'));
 });
 
 const PORT = process.env.PORT || 3000;
 
-server.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-  console.log(`WebSocket server is ready for connections on ws://localhost:${PORT}/ws`);
+// Wait for the server to start before resolving
+await new Promise<void>((resolve) => {
+  server.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+    console.log(`WebSocket server ready at ws://localhost:${PORT}/ws`);
+    resolve();
+  });
 });
