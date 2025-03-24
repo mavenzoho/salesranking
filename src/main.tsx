@@ -20,9 +20,8 @@ root.render(
 
 // Setup WebSocket connection
 const setupWebSocket = () => {
-  // Get the current hostname from window.location
-  const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-  const wsUrl = `${wsProtocol}//${window.location.host}/ws`;
+  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const wsUrl = `${protocol}//${window.location.host}/ws`;
   
   console.log('Connecting to WebSocket:', wsUrl);
   const ws = new WebSocket(wsUrl);

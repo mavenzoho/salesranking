@@ -23,17 +23,18 @@ export default defineConfig({
     }
   },
   server: {
-    port: 5173,
     proxy: {
       '/ws': {
         target: 'ws://localhost:3000',
         ws: true,
-        rewrite: (path) => path.replace(/^\/ws/, '/ws'),
+        secure: false,
+        rewrite: (path) => path.replace(/^\/ws/, '/ws')
       },
       '/webhook': {
         target: 'http://localhost:3000',
         changeOrigin: true,
-      },
-    },
-  },
+        secure: false
+      }
+    }
+  }
 });

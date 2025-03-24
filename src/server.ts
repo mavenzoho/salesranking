@@ -14,7 +14,7 @@ const server = http.createServer(app);
 
 // Configure WebSocket server
 const wss = new WebSocketServer({ 
-  noServer: true
+  noServer: true // Use noServer to handle upgrade manually
 });
 
 // Configure CORS and body parsing
@@ -153,11 +153,8 @@ app.get('*', (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 
-// Wait for the server to start before resolving
-await new Promise<void>((resolve) => {
-  server.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
-    console.log(`WebSocket server ready at ws://localhost:${PORT}/ws`);
-    resolve();
-  });
+// Start the server
+server.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+  console.log(`WebSocket server ready at ws://localhost:${PORT}/ws`);
 });
