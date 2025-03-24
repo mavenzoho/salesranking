@@ -77,11 +77,11 @@ app.post('/webhook', (req, res) => {
   
   try {
     // Split the text into lines and remove empty lines
-    const lines = textData.split('\n').map(line => line.trim()).filter(Boolean);
+    const lines: string[] = textData.split('\n').map((line: string) => line.trim()).filter(Boolean);
     console.log('Processed lines:', lines);
 
     // Extract rankings (skip the first line which is the title)
-    const rankings = lines
+    const rankings: RankingEntry[] = lines
       .slice(1)
       .map((line: string) => {
         // Match lines like "1. Name" or "10. Name"
