@@ -67,27 +67,36 @@ interface RankingEntry {
 
 // Webhook endpoint
 app.post('/webhook', (req, res) => {
+  console.log('Received webhook data:', req.body);
+
   const textData = req.body.text || req.body.data;
   if (!textData) {
+    console.error('Missing text/data in request body:', req.body);
     return res.status(400).json({ error: 'Missing text/data' });
   }
   
   try {
-    const lines = textData.split('\n').filter((line: string) => line.trim());
+    // Split the text into lines and remove empty lines
+    const lines = textData.split('\n').map(line => line.trim()).filter(Boolean);
+    console.log('Processed lines:', lines);
+
+    // Extract rankings (skip the first line which is the title)
     const rankings = lines
       .slice(1)
       .map((line: string) => {
-        const match = line.match(/^\d+\.\s+(.+)$/);
+        // Match lines like "1. Name" or "10. Name"
+        const match = line.match(/^(\d+)\.\s+(.+)$/);
         if (match) {
           return {
-            rank: parseInt(line.match(/^\d+/)?.[0] ?? '0', 10),
-            name: match[1].trim()
+            rank: parseInt(match[1], 10),
+            name: match[2].trim()
           };
         }
         return null;
       })
-      .filter((entry: RankingEntry | null): entry is RankingEntry => entry !== null)
-      .slice(0, 10);
+      .filter((entry: RankingEntry | null): entry is RankingEntry => entry !== null);
+
+    console.log('Parsed rankings:', rankings);
 
     const update = {
       lastUpdated: new Date().toLocaleString(),
@@ -95,13 +104,20 @@ app.post('/webhook', (req, res) => {
     };
 
     // Broadcast to all connected clients
+    let broadcastCount = 0;
     wss.clients.forEach(client => {
       if (client.readyState === WebSocket.OPEN) {
         client.send(JSON.stringify(update));
+        broadcastCount++;
       }
     });
 
-    res.json({ success: true, rankings });
+    console.log(`Broadcasted to ${broadcastCount} clients`);
+    res.json({ 
+      success: true, 
+      rankings,
+      clientCount: broadcastCount
+    });
   } catch (error) {
     console.error('Error processing webhook data:', error);
     res.status(500).json({ 
