@@ -4,6 +4,7 @@ import { WebSocketServer, WebSocket } from 'ws';
 import http from 'http';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import type { RankingsState, SalesPerson } from './types';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -16,9 +17,11 @@ const wss = new WebSocketServer({
   noServer: true
 });
 
-// Configure CORS
+// Configure CORS and body parsing
 app.use(cors());
 app.use(express.json());
+app.use(express.urlencoded({ extended: true })); // Add this for form data
+app.use(express.text()); // Add this for raw text
 
 // Serve static files from the client build directory
 app.use(express.static(path.join(__dirname, '../dist/client')));
@@ -46,10 +49,12 @@ wss.on('connection', (ws) => {
   console.log('New client connected');
   
   // Send initial empty data
-  ws.send(JSON.stringify({
+  const initialData: RankingsState = {
     lastUpdated: new Date().toLocaleString(),
     rankings: []
-  }));
+  };
+  
+  ws.send(JSON.stringify(initialData));
   
   ws.on('close', () => {
     console.log('Client disconnected');
@@ -60,16 +65,30 @@ wss.on('connection', (ws) => {
   });
 });
 
-interface RankingEntry {
-  rank: number;
-  name: string;
-}
+interface RankingEntry extends SalesPerson {}
 
 // Webhook endpoint
 app.post('/webhook', (req, res) => {
-  console.log('Received webhook data:', req.body);
+  console.log('Received webhook request:', {
+    headers: req.headers,
+    body: req.body,
+    rawBody: req.body.toString()
+  });
 
-  const textData = req.body.text || req.body.data;
+  let textData: string;
+
+  // Handle different content types
+  if (typeof req.body === 'string') {
+    textData = req.body;
+  } else if (req.body && (req.body.text || req.body.data)) {
+    textData = req.body.text || req.body.data;
+  } else if (req.body && typeof req.body === 'object') {
+    textData = JSON.stringify(req.body);
+  } else {
+    console.error('Invalid request body format:', req.body);
+    return res.status(400).json({ error: 'Invalid request body format' });
+  }
+
   if (!textData) {
     console.error('Missing text/data in request body:', req.body);
     return res.status(400).json({ error: 'Missing text/data' });
@@ -98,7 +117,7 @@ app.post('/webhook', (req, res) => {
 
     console.log('Parsed rankings:', rankings);
 
-    const update = {
+    const update: RankingsState = {
       lastUpdated: new Date().toLocaleString(),
       rankings
     };

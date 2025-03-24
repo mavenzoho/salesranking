@@ -28,9 +28,11 @@ export default defineConfig({
       '/ws': {
         target: 'ws://localhost:3000',
         ws: true,
+        rewrite: (path) => path.replace(/^\/ws/, '/ws'),
       },
       '/webhook': {
         target: 'http://localhost:3000',
+        changeOrigin: true,
       },
     },
   },
