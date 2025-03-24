@@ -10,6 +10,7 @@ function App({ initialData }: AppProps) {
   const [rankingsData, setRankingsData] = useState<RankingsState>(initialData);
 
   useEffect(() => {
+    console.log('Received new rankings data:', initialData);
     setRankingsData(initialData);
   }, [initialData]);
 
@@ -51,20 +52,26 @@ function App({ initialData }: AppProps) {
           </div>
           
           <div className="space-y-4">
-            {rankingsData.rankings.map((person) => (
-              <div
-                key={person.rank}
-                className={`flex items-center p-4 border-2 rounded-lg transition-all duration-300 transform hover:scale-[1.02] ${getRankStyle(person.rank)}`}
-              >
-                <div className="flex items-center w-16">
-                  {getRankIcon(person.rank)}
-                  <span className="ml-2 font-bold text-gray-700">#{person.rank}</span>
-                </div>
-                <div className="flex-1 ml-4">
-                  <h3 className="text-lg font-semibold text-gray-800">{person.name}</h3>
-                </div>
+            {rankingsData.rankings.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">
+                Waiting for rankings data...
               </div>
-            ))}
+            ) : (
+              rankingsData.rankings.map((person) => (
+                <div
+                  key={person.rank}
+                  className={`flex items-center p-4 border-2 rounded-lg transition-all duration-300 transform hover:scale-[1.02] ${getRankStyle(person.rank)}`}
+                >
+                  <div className="flex items-center w-16">
+                    {getRankIcon(person.rank)}
+                    <span className="ml-2 font-bold text-gray-700">#{person.rank}</span>
+                  </div>
+                  <div className="flex-1 ml-4">
+                    <h3 className="text-lg font-semibold text-gray-800">{person.name}</h3>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </div>
       </div>

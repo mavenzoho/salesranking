@@ -20,16 +20,12 @@ root.render(
 
 // Setup WebSocket connection
 const setupWebSocket = () => {
-  // Get the current URL
-  const url = new URL(window.location.href);
-  const wsProtocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
-  const host = url.host;
+  // Get the current hostname from window.location
+  const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const wsUrl = `${wsProtocol}//${window.location.host}/ws`;
   
-  // Use the current host for WebSocket connection
-  const WS_URL = `${wsProtocol}//${host}/ws`;
-  
-  console.log('Connecting to WebSocket:', WS_URL);
-  const ws = new WebSocket(WS_URL);
+  console.log('Connecting to WebSocket:', wsUrl);
+  const ws = new WebSocket(wsUrl);
 
   ws.onopen = () => {
     console.log('WebSocket connection established');
@@ -38,7 +34,7 @@ const setupWebSocket = () => {
   ws.onmessage = (event) => {
     try {
       const data = JSON.parse(event.data);
-      console.log('Received data:', data);
+      console.log('Received rankings data:', data);
       root.render(
         <StrictMode>
           <App initialData={data} />
@@ -51,7 +47,6 @@ const setupWebSocket = () => {
 
   ws.onerror = (error) => {
     console.error('WebSocket error:', error);
-    // Attempt to reconnect after error with exponential backoff
     setTimeout(setupWebSocket, 5000);
   };
 
