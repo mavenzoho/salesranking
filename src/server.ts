@@ -86,7 +86,7 @@ app.post('/webhook', (req, res) => {
         }
         return null;
       })
-      .filter((entry): entry is RankingEntry => entry !== null)
+      .filter((entry: RankingEntry | null): entry is RankingEntry => entry !== null)
       .slice(0, 10);
 
     const update = {

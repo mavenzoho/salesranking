@@ -19,6 +19,10 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, '../dist/client')));
 // Handle WebSocket upgrade requests
 server.on('upgrade', (request, socket, head) => {
+    if (!request.url) {
+        socket.destroy();
+        return;
+    }
     const pathname = new URL(request.url, `http://${request.headers.host}`).pathname;
     if (pathname === '/ws') {
         wss.handleUpgrade(request, socket, head, (ws) => {
@@ -51,20 +55,20 @@ app.post('/webhook', (req, res) => {
         return res.status(400).json({ error: 'Missing text/data' });
     }
     try {
-        const lines = textData.split('\n').filter(line => line.trim());
+        const lines = textData.split('\n').filter((line) => line.trim());
         const rankings = lines
             .slice(1)
             .map((line) => {
             const match = line.match(/^\d+\.\s+(.+)$/);
             if (match) {
                 return {
-                    rank: parseInt(line.match(/^\d+/)[0], 10),
+                    rank: parseInt(line.match(/^\d+/)?.[0] ?? '0', 10),
                     name: match[1].trim()
                 };
             }
             return null;
         })
-            .filter(Boolean)
+            .filter((entry) => entry !== null)
             .slice(0, 10);
         const update = {
             lastUpdated: new Date().toLocaleString(),
@@ -80,7 +84,10 @@ app.post('/webhook', (req, res) => {
     }
     catch (error) {
         console.error('Error processing webhook data:', error);
-        res.status(500).json({ error: 'Failed to process rankings data' });
+        res.status(500).json({
+            error: 'Failed to process rankings data',
+            details: error instanceof Error ? error.message : 'Unknown error'
+        });
     }
 });
 // Serve index.html for all other routes
