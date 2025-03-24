@@ -20,8 +20,8 @@ const wss = new WebSocketServer({
 // Configure CORS and body parsing
 app.use(cors());
 app.use(express.json());
-app.use(express.urlencoded({ extended: true })); // Add this for form data
-app.use(express.text()); // Add this for raw text
+app.use(express.text({ type: '*/*' })); // Handle all content types as text
+app.use(express.urlencoded({ extended: true }));
 
 // Serve static files from the client build directory
 app.use(express.static(path.join(__dirname, '../dist/client')));
@@ -65,42 +65,42 @@ wss.on('connection', (ws) => {
   });
 });
 
-interface RankingEntry extends SalesPerson {}
-
 // Webhook endpoint
 app.post('/webhook', (req, res) => {
   console.log('Received webhook request:', {
-    headers: req.headers,
-    body: req.body,
-    rawBody: req.body.toString()
+    contentType: req.headers['content-type'],
+    body: req.body
   });
 
   let textData: string;
 
-  // Handle different content types
+  // Handle the incoming data based on content type
   if (typeof req.body === 'string') {
     textData = req.body;
-  } else if (req.body && (req.body.text || req.body.data)) {
-    textData = req.body.text || req.body.data;
   } else if (req.body && typeof req.body === 'object') {
-    textData = JSON.stringify(req.body);
+    if (req.body.text || req.body.data) {
+      textData = req.body.text || req.body.data;
+    } else {
+      // If no text/data field, try to use the entire body
+      textData = JSON.stringify(req.body);
+    }
   } else {
     console.error('Invalid request body format:', req.body);
     return res.status(400).json({ error: 'Invalid request body format' });
   }
 
   if (!textData) {
-    console.error('Missing text/data in request body:', req.body);
-    return res.status(400).json({ error: 'Missing text/data' });
+    console.error('Missing text data in request body');
+    return res.status(400).json({ error: 'Missing text data' });
   }
-  
+
   try {
     // Split the text into lines and remove empty lines
-    const lines: string[] = textData.split('\n').map((line: string) => line.trim()).filter(Boolean);
+    const lines = textData.split('\n').map(line => line.trim()).filter(Boolean);
     console.log('Processed lines:', lines);
 
     // Extract rankings (skip the first line which is the title)
-    const rankings: RankingEntry[] = lines
+    const rankings: SalesPerson[] = lines
       .slice(1)
       .map((line: string) => {
         // Match lines like "1. Name" or "10. Name"
@@ -113,7 +113,7 @@ app.post('/webhook', (req, res) => {
         }
         return null;
       })
-      .filter((entry: RankingEntry | null): entry is RankingEntry => entry !== null);
+      .filter((entry): entry is SalesPerson => entry !== null);
 
     console.log('Parsed rankings:', rankings);
 
