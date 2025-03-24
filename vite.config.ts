@@ -10,11 +10,6 @@ export default defineConfig({
   build: {
     outDir: 'dist/client',
     emptyOutDir: true,
-    rollupOptions: {
-      input: {
-        main: path.resolve(__dirname, 'index.html'),
-      },
-    },
   },
   resolve: {
     alias: {
